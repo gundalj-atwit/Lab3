@@ -1,0 +1,228 @@
+package JavaFXDemo;
+
+import javafx.application.Application;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class Main extends Application {
+
+    private final List<MyShape> shapes = new ArrayList<>();
+    private final Map<String, MyShape> shapeMap = new HashMap<>();
+    private final ObservableList<String> displayedNames = FXCollections.observableArrayList();
+
+    private final Pane canvas = new Pane();
+    private ListView<String> shapeListView;
+    private ComboBox<String> filterCombo;
+    private TextField renameField;
+    private Label gamePromptLabel;
+    private Label scoreLabel;
+
+    private int shapeCounter = 0;
+    private int score = 0;
+    private String currentTargetType = "Circle";
+
+    @Override
+    public void start(Stage primaryStage) {
+
+        canvas.setPrefSize(600, 400);
+
+        Button addShapeBtn = new Button("Add Random Shape");
+        Button removeBtn = new Button("Remove Selected");
+        Button renameBtn = new Button("Rename Selected");
+
+        filterCombo = new ComboBox<>();
+        filterCombo.getItems().addAll("All", "Circle", "Rectangle", "Triangle");
+        filterCombo.setValue("All");
+
+        shapeListView = new ListView<>(displayedNames);
+        shapeListView.setPrefWidth(170);
+        shapeListView.setPrefHeight(300);
+
+        renameField = new TextField();
+        renameField.setPromptText("New name");
+
+        gamePromptLabel = new Label("Find type: " + currentTargetType);
+        scoreLabel = new Label("Score: 0");
+
+        addShapeBtn.setOnAction(e -> addRandomShape());
+        filterCombo.setOnAction(e -> applyFilter());
+
+        shapeListView.getSelectionModel().selectedItemProperty().addListener((obs, oldName, newName) -> {
+            if (newName != null) {
+                highlightShape(newName);
+                checkGameSelection(newName);
+            }
+        });
+
+        removeBtn.setOnAction(e -> removeSelectedShape());
+        renameBtn.setOnAction(e -> renameSelectedShape());
+
+        HBox topBar = new HBox(10, addShapeBtn, new Label("Filter:"), filterCombo);
+        HBox renameBar = new HBox(5, renameField, renameBtn);
+        VBox rightPanel = new VBox(10,
+                new Label("Shapes:"),
+                shapeListView,
+                removeBtn,
+                renameBar,
+                gamePromptLabel,
+                scoreLabel
+        );
+        rightPanel.setPrefWidth(220);
+
+        BorderPane root = new BorderPane();
+        root.setTop(topBar);
+        root.setCenter(canvas);
+        root.setRight(rightPanel);
+        root.setStyle("-fx-padding: 10;");
+
+        Scene scene = new Scene(root, 850, 460);
+        primaryStage.setTitle("Shape Gallery - App & Game");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+
+        pickNewTargetType();
+    }
+
+    private void addRandomShape() {
+        shapeCounter++;
+        String name = "Shape " + shapeCounter;
+
+        double x = Math.random() * 500 + 50;
+        double y = Math.random() * 300 + 50;
+
+        int r = (int) (Math.random() * 3);
+
+        MyShape shape;
+        if (r == 0) {
+            shape = new MyCircle(name, x, y);
+        } else if (r == 1) {
+            shape = new MyRectangle(name, x, y);
+        } else {
+            shape = new MyTriangle(name, x, y);
+        }
+
+        shapes.add(shape);
+        shapeMap.put(name, shape);
+
+        shape.draw(canvas);
+        applyFilter();
+        pickNewTargetType();
+    }
+
+    private void applyFilter() {
+        String filter = filterCombo.getValue();
+        displayedNames.clear();
+
+        for (MyShape s : shapes) {
+            if (matchesFilter(s, filter)) {
+                displayedNames.add(s.getName());
+            }
+        }
+    }
+
+    private boolean matchesFilter(MyShape shape, String filter) {
+        if (filter == null || filter.equals("All")) return true;
+        if (filter.equals("Circle")) return shape instanceof MyCircle;
+        if (filter.equals("Rectangle")) return shape instanceof MyRectangle;
+        if (filter.equals("Triangle")) return shape instanceof MyTriangle;
+        return true;
+    }
+
+    private void highlightShape(String name) {
+        MyShape selected = shapeMap.get(name);
+        if (selected == null) return;
+
+        canvas.getChildren().clear();
+
+        for (MyShape s : shapes) {
+            s.draw(canvas);
+        }
+
+        selected.highlight(canvas);
+    }
+
+    private void removeSelectedShape() {
+        String selectedName = shapeListView.getSelectionModel().getSelectedItem();
+        if (selectedName == null) return;
+
+        MyShape shape = shapeMap.remove(selectedName);
+        if (shape == null) return;
+
+        shapes.remove(shape);
+
+        canvas.getChildren().clear();
+        for (MyShape s : shapes) {
+            s.draw(canvas);
+        }
+
+        applyFilter();
+    }
+
+    private void renameSelectedShape() {
+        String selectedName = shapeListView.getSelectionModel().getSelectedItem();
+        if (selectedName == null) return;
+
+        String newName = renameField.getText();
+        if (newName == null) return;
+        newName = newName.trim();
+        if (newName.isEmpty()) return;
+        if (shapeMap.containsKey(newName)) return;
+
+        MyShape shape = shapeMap.remove(selectedName);
+        if (shape == null) return;
+
+        shape.setName(newName);
+        shapeMap.put(newName, shape);
+
+        applyFilter();
+
+        shapeListView.getSelectionModel().select(newName);
+        renameField.clear();
+    }
+
+    private void pickNewTargetType() {
+        int r = (int) (Math.random() * 3);
+        if (r == 0) currentTargetType = "Circle";
+        else if (r == 1) currentTargetType = "Rectangle";
+        else currentTargetType = "Triangle";
+        gamePromptLabel.setText("Find type: " + currentTargetType);
+    }
+
+    private void checkGameSelection(String selectedName) {
+        MyShape shape = shapeMap.get(selectedName);
+        if (shape == null) return;
+
+        String type = typeOfShape(shape);
+        if (type.equals(currentTargetType)) {
+            score++;
+            scoreLabel.setText("Score: " + score);
+            pickNewTargetType();
+        }
+    }
+
+    private String typeOfShape(MyShape shape) {
+        if (shape instanceof MyCircle) return "Circle";
+        if (shape instanceof MyRectangle) return "Rectangle";
+        if (shape instanceof MyTriangle) return "Triangle";
+        return "";
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
+
+
