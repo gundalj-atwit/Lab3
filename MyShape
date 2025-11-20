@@ -1,0 +1,27 @@
+package JavaFXDemo;
+
+import javafx.scene.layout.Pane;
+
+public abstract class MyShape {
+
+    protected double x, y;
+    protected String name;
+
+    public MyShape(String name, double x, double y) {
+        this.name = name;
+        this.x = x;
+        this.y = y;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String newName) {
+        this.name = newName;
+    }
+
+    public abstract void draw(Pane pane);
+
+    public abstract void highlight(Pane pane);
+}
